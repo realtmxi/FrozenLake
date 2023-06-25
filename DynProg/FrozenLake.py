@@ -17,7 +17,7 @@ parser.add_argument(
     type=str,
     help="The name of the environment to run your algorithm on.",
     choices=["Deterministic-4x4-FrozenLake-v0", "Stochastic-4x4-FrozenLake-v0"],
-    default="Deterministic-4x4-FrozenLake-v0",
+    default="FrozenLake-v1",
 )
 
 parser.add_argument(
@@ -76,22 +76,23 @@ def policy_evaluation(P, nS, nA, policy, gamma=0.9, theta=1e-3):
 		the value of state s
 	"""
     # initialize the value function V(s)
-    V = np.zeros(nS)
+    V = np.zeros(nS, dtype="int")
 
     ############################
     # YOUR IMPLEMENTATION HERE #
-    delta = theta + 1
-    v = 0
-    while delta >= theta:
+    while True:
         delta = 0
         for s in range(nS):
-            a = policy[s] # policy action to evaluate
+            old_v = V[s]
+            a = policy[s]  # policy action to evaluate
 
             for probability, next_state, reward, _ in P[s][a]:
                 V[s] += probability * (reward + gamma * V[next_state])
 
-        delta = max(delta, abs(v - V[s]))
-        v = V[s]
+        delta = max(delta, abs(old_v - V[s]))
+
+        if delta < theta:
+            break
 
     ############################
     return V
@@ -154,18 +155,18 @@ def policy_iteration(P, nS, nA, gamma=0.9, theta=1e-3):
 	"""
     # Initialization
     V = np.zeros(nS)
-    policy = np.zeros(nS, dtype=int)
+    policy = np.zeros(nS)
     i = 0
 
     ############################
     # YOUR IMPLEMENTATION HERE #
     policy_stable = False
-    while not policy_stable and i < 100:
+    while not policy_stable and i < 10000:
         # Policy Evaluation
         V = policy_evaluation(P, nS, nA, policy, gamma, theta)
 
         # Policy Improvement
-        new_policy = policy_improvement(P, nS, nA, policy, gamma, theta)
+        new_policy = policy_improvement(P, nS, nA, V, policy, gamma)
 
         if np.array_equal(policy, new_policy):
             policy_stable = True
@@ -176,7 +177,7 @@ def policy_iteration(P, nS, nA, gamma=0.9, theta=1e-3):
     return V, policy
 
 
-def value_iteration(P, nS, nA, gamma=0.9, tol=1e-3):
+def value_iteration(P, nS, nA, gamma=0.9, theta=1e-3):
     """
     Learn value function and policy by using value iteration method for a given
     gamma and environment.
@@ -185,22 +186,32 @@ def value_iteration(P, nS, nA, gamma=0.9, tol=1e-3):
 	----------
 	P, nS, nA, gamma:
 		defined at beginning of file
-	tol: float
+	theta: float
 		Terminate value iteration when
 			max |value_function(s) - prev_value_function(s)| < tol
 	Returns:
 	----------
-	value_function: np.ndarray[nS]
+	V: np.ndarray[nS]
 	policy: np.ndarray[nS]
 	"""
 
-    value_function = np.zeros(nS)
+    V = np.zeros(nS)
     policy = np.zeros(nS, dtype=int)
     ############################
     # YOUR IMPLEMENTATION HERE #
+    while True:
+        delta = 0
+        for s in range(nS):
+            v = V[s]
+            optimal_update(P, nS, nA, gamma, theta)
+            delta = max(delta, abs(v -V[s]))
+        if delta < theta:
+            break
 
+    for s in range(nS):
+        policy = argmax(P, nS, nA, policy, s, gamma)
     ############################
-    return value_function, policy
+    return V, policy
 
 
 def render_single(env, policy, max_steps=1000):
@@ -220,17 +231,19 @@ def render_single(env, policy, max_steps=1000):
     episode_reward = 0
     observation, _ = env.reset()
     for t in range(max_steps):
+        print("The agent begins episode {}.".format(t))
         env.render()
         time.sleep(0.25)
-        a = policy[observation]
-        observation, reward, terminated, truncated, info = env.step(a)
+        action = policy[observation]
+        observation, reward, done, _, _ = env.step(action)
         episode_reward += reward
-        #print("The agent begins {} episode.".format(t))
-        if terminated or truncated:
-            observation, info = env.reset()
-
+        if done and reward == 1:
+            print("You reach the goal in {} steps.".format(t))
+            break
+        elif done and reward == 0:
+            print("you fell in a hole!")
     env.render()
-    if not terminated:
+    if not done:
         print(
             "The agent didn't reach a terminal state in {} steps.".format(
                 max_steps
@@ -248,10 +261,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Make gym environment
-    env = gym.make(args.env, render_mode=args.render_mode)
+    env = gym.make(args.env, render_mode=args.render_mode, map_name="4x4", is_slippery=False)
 
     env.nS = env.nrow * env.ncol
     env.nA = 4
+    print(env.P[0][1])
 
     print("\n" + "-" * 25 + "\nBeginning Policy Iteration\n" + "-" * 25)
 
