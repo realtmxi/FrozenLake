@@ -17,7 +17,7 @@ parser.add_argument(
     type=str,
     help="The name of the environment to run your algorithm on.",
     choices=["Deterministic-4x4-FrozenLake-v0", "Stochastic-4x4-FrozenLake-v0"],
-    default="FrozenLake-v1",
+    default="Deterministic-4x4-FrozenLake-v0",
 )
 
 parser.add_argument(
@@ -199,22 +199,29 @@ def value_iteration(P, nS, nA, gamma=0.9, theta=1e-3):
     policy = np.zeros(nS, dtype=int)
     ############################
     # YOUR IMPLEMENTATION HERE #
+    # max_iteration = 1000
+    # for i in range(max_iteration):
     while True:
         delta = 0
         for s in range(nS):
             v = V[s]
-            optimal_update(P, nS, nA, gamma, theta)
-            delta = max(delta, abs(v -V[s]))
+            action_values = np.zeros(nA)
+            for a in range(nA):
+                state_value = 0
+                for prob, next_state, reward, _ in P[s][a]:
+                    state_value += prob * (reward + gamma * V[next_state])
+                action_values[a] = state_value
+            best_action = np.argmax(action_values)
+            V[s] = action_values[best_action]
+            policy[s] = best_action
+            delta = max(delta, abs(v - V[s]))
         if delta < theta:
             break
-
-    for s in range(nS):
-        policy = argmax(P, nS, nA, policy, s, gamma)
     ############################
     return V, policy
 
 
-def render_single(env, policy, max_steps=1000):
+def render_single(env, policy, max_steps=100):
     """
     This function does not need to be modified
     Renders policy once on environment. Watch your agent play!
@@ -261,18 +268,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Make gym environment
-    env = gym.make(args.env, render_mode=args.render_mode, map_name="4x4", is_slippery=False)
+    env = gym.make(args.env, render_mode=args.render_mode, map_name="8x8", is_slippery=False)
 
     env.nS = env.nrow * env.ncol
     env.nA = 4
-    print(env.P[0][1])
 
-    print("\n" + "-" * 25 + "\nBeginning Policy Iteration\n" + "-" * 25)
-
-    V_pi, p_pi = policy_iteration(env.P, env.nS, env.nA, gamma=0.9, theta=1e-3)
-    render_single(env, p_pi, 100)
+    # print("\n" + "-" * 25 + "\nBeginning Policy Iteration\n" + "-" * 25)
+    #
+    # V_pi, p_pi = policy_iteration(env.P, env.nS, env.nA, gamma=0.9, theta=1e-3)
+    # render_single(env, p_pi, 100)
 
     # print("\n" + "-" * 25 + "\nBeginning Value Iteration\n" + "-" * 25)
 
-    # V_vi, p_vi = value_iteration(env.P, env.nS, env.nA, gamma=0.9, tol=1e-3)
-    # render_single(env, p_vi, 100)
+    V_vi, p_vi = value_iteration(env.P, env.nS, env.nA, gamma=0.9, theta=1e-3)
+    render_single(env, p_vi, 100)
