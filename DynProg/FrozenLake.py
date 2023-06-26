@@ -53,6 +53,7 @@ the parameters P, nS, nA, gamma are defined as follows:
 	gamma: float
 		Discount factor. Number in range [0, 1)
 """
+max_iteration = 100
 
 
 def policy_evaluation(P, nS, nA, policy, gamma=0.9, theta=1e-3):
@@ -76,24 +77,22 @@ def policy_evaluation(P, nS, nA, policy, gamma=0.9, theta=1e-3):
 		the value of state s
 	"""
     # initialize the value function V(s)
-    V = np.zeros(nS, dtype="int")
+    V = np.zeros(nS)
 
     ############################
     # YOUR IMPLEMENTATION HERE #
     while True:
         delta = 0
         for s in range(nS):
-            old_v = V[s]
+            v = 0
             a = policy[s]  # policy action to evaluate
+            for prob, next_state, reward, _ in P[s][a]:
+                v += prob * (reward + gamma * V[next_state])
 
-            for probability, next_state, reward, _ in P[s][a]:
-                V[s] += probability * (reward + gamma * V[next_state])
-
-        delta = max(delta, abs(old_v - V[s]))
-
+            delta = max(delta, abs(v - V[s]))
+            V[s] = v
         if delta < theta:
             break
-
     ############################
     return V
 
@@ -126,9 +125,9 @@ def policy_improvement(P, nS, nA, value_from_policy, policy, gamma=0.9):
     for s in range(nS):
         action_values = np.zeros(nA)
         for a in range(nA):
-            for probability, next_state, reward, _ in P[s][a]:
-                action_values[a] += probability * (reward + gamma * value_from_policy[next_state])
-        # find the greedy policy with respect to v_{s},
+            for prob, next_state, reward, _ in P[s][a]:
+                action_values[a] += prob * (reward + gamma * value_from_policy[next_state])
+        # find the greedy policy with respect to v_{s}
         greedy_action = np.argmax(action_values)
         new_policy[s] = greedy_action
     ############################
@@ -155,24 +154,24 @@ def policy_iteration(P, nS, nA, gamma=0.9, theta=1e-3):
 	"""
     # Initialization
     V = np.zeros(nS)
-    policy = np.zeros(nS)
-    i = 0
+    policy = np.zeros(nS, dtype=int)
 
     ############################
     # YOUR IMPLEMENTATION HERE #
+    counter = 0
     policy_stable = False
-    while not policy_stable and i < 10000:
+    while (not policy_stable) and counter < max_iteration:
+        counter += 1
         # Policy Evaluation
         V = policy_evaluation(P, nS, nA, policy, gamma, theta)
 
         # Policy Improvement
         new_policy = policy_improvement(P, nS, nA, V, policy, gamma)
 
-        if np.array_equal(policy, new_policy):
+        if np.all(policy == new_policy):
             policy_stable = True
 
         policy = new_policy
-        i += 1
     ############################
     return V, policy
 
@@ -199,8 +198,6 @@ def value_iteration(P, nS, nA, gamma=0.9, theta=1e-3):
     policy = np.zeros(nS, dtype=int)
     ############################
     # YOUR IMPLEMENTATION HERE #
-    # max_iteration = 1000
-    # for i in range(max_iteration):
     while True:
         delta = 0
         for s in range(nS):
@@ -238,7 +235,6 @@ def render_single(env, policy, max_steps=100):
     episode_reward = 0
     observation, _ = env.reset()
     for t in range(max_steps):
-        print("The agent begins episode {}.".format(t))
         env.render()
         time.sleep(0.25)
         action = policy[observation]
@@ -268,17 +264,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Make gym environment
-    env = gym.make(args.env, render_mode=args.render_mode, map_name="8x8", is_slippery=False)
+    env = gym.make(args.env, render_mode=args.render_mode, map_name="4x4", is_slippery=False)
 
     env.nS = env.nrow * env.ncol
     env.nA = 4
 
-    # print("\n" + "-" * 25 + "\nBeginning Policy Iteration\n" + "-" * 25)
-    #
-    # V_pi, p_pi = policy_iteration(env.P, env.nS, env.nA, gamma=0.9, theta=1e-3)
-    # render_single(env, p_pi, 100)
+    print("\n" + "-" * 25 + "\nBeginning Policy Iteration\n" + "-" * 25)
+
+    V_pi, p_pi = policy_iteration(env.P, env.nS, env.nA, gamma=0.9, theta=1e-3)
+    render_single(env, p_pi, 100)
 
     # print("\n" + "-" * 25 + "\nBeginning Value Iteration\n" + "-" * 25)
-
-    V_vi, p_vi = value_iteration(env.P, env.nS, env.nA, gamma=0.9, theta=1e-3)
-    render_single(env, p_vi, 100)
+    #
+    # V_vi, p_vi = value_iteration(env.P, env.nS, env.nA, gamma=0.9, theta=1e-3)
+    # render_single(env, p_vi, 100)
