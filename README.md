@@ -1,6 +1,8 @@
 # FrozenLake
 This environment is part of the Toy Text environments which contains general information about the environment.
 https://gymnasium.farama.org/environments/toy_text/frozen_lake
+
+I've trained the agent through Dynamic Programmning. (Value Iteration vs Policy Iteration)
 [](https://gymnasium.farama.org/_images/frozen_lake.gif)
 ## Action Space
 - 0: Move left
